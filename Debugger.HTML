@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUGGER: FINAL DE-BUG</title>
+    <style>
+
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #000; color: #00FF41; font-family: 'VT323', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        #game-container { width: 800px; height: 600px; background-color: #0a0a0a; border: 2px solid #00FF41; box-shadow: 0 0 20px #00FF41; position: relative; overflow: hidden; cursor: pointer; }
+        #game-screen { width: 100%; height: 100%; position: relative; }
+        .game-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 100; font-size: 24px; }
+        .game-overlay h1 { font-size: 64px; color: #FF0000; text-shadow: 0 0 10px #FF0000; }
+        .game-overlay h2 { font-size: 32px; color: #fff; }
+        .game-overlay p { margin-top: 20px; font-size: 28px; }
+        #start-screen p { animation: blink 1.5s linear infinite; }
+        #screamer-image { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 101; }
+        #ui-container { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 50; }
+        #integrity-label { font-size: 24px; }
+        #integrity-bar { width: 100%; height: 20px; background-color: #333; border: 2px solid #00FF41; }
+        #integrity-fill { width: 100%; height: 100%; background-color: #00FF41; transition: width 0.1s linear; }
+        #bugger-message { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.95); display: flex; justify-content: center; align-items: center; text-align: center; font-size: 64px; color: #FF0000; z-index: 90; text-shadow: 0 0 10px #FF0000; display: none; }
+        #lanes-container { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 400px; height: 100%; display: flex; justify-content: space-around; perspective: 500px; }
+        .lane { width: 80px; height: 100%; border-left: 2px dashed #333; border-right: 2px dashed #333; position: relative; transform-style: preserve-3d; transform: rotateX(10deg) scaleY(1.2); }
+        #target-line { position: absolute; bottom: 50px; left: 0; width: 100%; height: 10px; background: rgba(0, 255, 65, 0.3); border-top: 2px solid #00FF41; border-bottom: 2px solid #00FF41; z-index: 10; }
+        .key-indicator { position: absolute; bottom: 10px; width: 60px; height: 40px; border: 2px solid #00FF41; font-size: 32px; text-align: center; line-height: 36px; color: #00FF41; left: 50%; transform: translateX(-50%); transition: background-color 0.05s; }
+        .key-indicator.active { background-color: #00FF41; color: #000; box-shadow: 0 0 10px #00FF41; }
+        .note { position: absolute; width: 80px; height: 20px; background-color: #00FF41; left: 0; top: -20px; will-change: transform; transition: background-color 0.1s; }
+        .note.hit { background-color: #0FF; animation: hit-pulse 0.1s linear; }
+        .popup { position: absolute; width: 250px; height: 150px; background: #ccc; border: 4px outset #eee; color: #000; z-index: 60; padding: 5px; display: flex; flex-direction: column; animation: zoomIn 0.2s ease-out; }
+        .popup-titlebar { background: #000080; color: #fff; padding: 3px; font-size: 18px; text-align: center; }
+        .popup-content { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #fff; padding: 10px; font-size: 20px; }
+        .popup-content p { font-size: 22px; color: #FF0000; margin-bottom: 10px; }
+        #code-injection-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 55; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        #code-injection-box { background: #000; border: 2px solid #FF0000; padding: 20px; font-size: 48px; text-shadow: 0 0 10px #FF0000; }
+        #code-prompt { color: #FF0000; }
+        #code-input { color: #fff; min-width: 150px; border-right: 3px solid #fff; animation: blink 0.7s linear infinite; }
+        #code-timer-bar { width: 300px; height: 10px; background: #333; border: 1px solid #FF0000; margin-top: 10px; }
+        #code-timer-fill { width: 100%; height: 100%; background: #FF0000; transition: width 0.1s linear; }
+        .glitch-effect { animation: glitch 0.5s linear infinite; }
+        @keyframes glitch { 0% { transform: translate(0); } 10% { transform: translate(-5px, 5px); } 20% { transform: translate(5px, -5px); } 30% { transform: translate(-5px, -5px); } 40% { transform: translate(5px, 5px); } 50% { transform: translate(-5px, 5px); } 60% { transform: translate(5px, -5px); } 70% { transform: translate(0); } 100% { transform: translate(0); } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes zoomIn { from { transform: scale(0.1); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes hit-pulse { from { transform: scale(1); } to { transform: scale(1.2); opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<audio id="boss-music" src="boss.mp3" loop preload="auto"></audio>
+<audio id="sfx-beep" src="beep.mp3" preload="auto"></audio>
+<audio id="sfx-screamer" src="screamer.mp3" preload="auto"></audio>
+
+<div id="game-container">
+    <div id="start-screen" class="game-overlay" style="display: none;">
+        <h1>BUGGER: FINAL DE-BUG</h1>
+        <p>Haz clic para iniciar la desinfección...</p>
+        <h2>Controles: [F] [J] [K] [L]</h2>
+    </div>
+    <div id="end-screen" class="game-overlay" style="display: none;">
+        <h1 id="end-title">GAME OVER</h1>
+        <h2 id="end-subtitle"></h2>
+        <p id="end-message" style="animation: none;">Haz clic para reintentar.</p>
+
+        <img id="screamer-image" src="scary_face.jpg" alt="SCREAMER">
+    </div>
+
+    <div id="game-screen" style="display: none;">
+        <div id="ui-container">
+            <div id="integrity-label">SYSTEM_INTEGRITY:</div>
+            <div id="integrity-bar">
+                <div id="integrity-fill"></div>
+            </div>
+        </div>
+        <div id="bugger-message"></div>
+
+        <div id="lanes-container">
+            <div class="lane" id="lane-0"></div>
+            <div class="lane" id="lane-1"></div>
+            <div class="lane" id="lane-2"></div>
+            <div class="lane" id="lane-3"></div>
+
+            <div id="target-line"></div>
+
+            <div class="key-indicator" style="left: 12.5%;">F</div>
+            <div class="key-indicator" style="left: 37.5%;">J</div>
+            <div class="key-indicator" style="left: 62.5%;">K</div>
+            <div class="key-indicator" style="left: 87.5%;">L</div>
+        </div>
+
+        <div id="code-injection-overlay" style="display: none;">
+            <div id="code-injection-box">
+                <span id="code-prompt">> </span><span id="code-input"></span>
+            </div>
+            <div id="code-timer-bar">
+                <div id="code-timer-fill"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- 1. REFERENCIAS AL DOM ---
+        const gameContainer = document.getElementById('game-container');
+        const startScreen = document.getElementById('start-screen');
+        const endScreen = document.getElementById('end-screen');
+        const gameScreen = document.getElementById('game-screen');
+
+        const integrityFill = document.getElementById('integrity-fill');
+        const buggerMessage = document.getElementById('bugger-message');
+        const lanesContainer = document.getElementById('lanes-container');
+        const targetLine = document.getElementById('target-line');
+        const keyIndicators = document.querySelectorAll('.key-indicator');
+
+        const codeInjectionOverlay = document.getElementById('code-injection-overlay');
+        const codeInput = document.getElementById('code-input');
+        const codeTimerFill = document.getElementById('code-timer-fill');
+
+        const endTitle = document.getElementById('end-title');
+        const endSubtitle = document.getElementById('end-subtitle');
+        const endMessage = document.getElementById('end-message');
+        const screamerImage = document.getElementById('screamer-image');
+
+        // Audios
+        const audioBoss = document.getElementById('boss-music');
+        const sfxBeep = document.getElementById('sfx-beep');
+        const sfxScreamer = document.getElementById('sfx-screamer');
+
+
+        // --- 2. CONFIGURACIÓN DEL JUEGO ---
+        const KEYS = ['f', 'j', 'k', 'l'];
+        const LANE_MAP = { 'f': 0, 'j': 1, 'k': 2, 'l': 3 };
+        const KEY_INDICATOR_MAP = { 'f': 0, 'j': 1, 'k': 2, 'l': 3 };
+
+        const NOTE_SPEED = 0.3; // Empieza lento
+        const HIT_WINDOW = 50;
+        const GAME_DURATION_MS = 60000;
+        const TARGET_Y = 540;
+
+        const ACCELERATION_RATE = 0.000050; // Acelera muy rápido
+
+        // --- EL "BEATMAP" (El corazón del juego) ---
+        const beatmap = [
+            // (El beatmap sigue igual)
+            { time: 2000, type: 'message', text: '...¿quién eres?' },
+            { time: 3000, type: 'note', lane: 0 },
+            { time: 3500, type: 'note', lane: 1 },
+            { time: 4000, type: 'note', lane: 0 },
+            { time: 5000, type: 'note', lane: 2 },
+            { time: 5500, type: 'note', lane: 3 },
+            { time: 6000, type: 'note', lane: 2 },
+            { time: 7000, type: 'note', lane: 1 },
+            { time: 7250, type: 'note', lane: 2 },
+            { time: 7500, type: 'note', lane: 3 },
+            { time: 8500, type: 'note', lane: 0 },
+            { time: 8750, type: 'note', lane: 1 },
+            { time: 9000, type: 'note', lane: 2 },
+            { time: 9250, type: 'note', lane: 3 },
+            { time: 10000, type: 'popup', key: 'f', duration: 3000, x: 50, y: 100 }, // El "key: f" se ignora, pero lo dejamos
+            { time: 11000, type: 'note', lane: 0 },
+            { time: 11000, type: 'note', lane: 3 },
+            { time: 12000, type: 'note', lane: 1 },
+            { time: 12000, type: 'note', lane: 2 },
+            { time: 14000, type: 'message', text: '...NO DEBERÍAS ESTAR AQUÍ.' },
+            { time: 15000, type: 'note', lane: 0 },
+            { time: 15250, type: 'note', lane: 0 },
+            { time: 15500, type: 'note', lane: 1 },
+            { time: 15750, type: 'note', lane: 1 },
+            { time: 16000, type: 'note', lane: 2 },
+            { time: 16250, type: 'note', lane: 3 },
+            { time: 16500, type: 'note', lane: 2 },
+            { time: 16750, type: 'note', lane: 1 },
+            { time: 20000, type: 'message', text: '¡¡MI SISTEMA!!' },
+            { time: 21000, type: 'code', sequence: ['j', 'f', 'k'], duration: 4000 },
+            { time: 22000, type: 'note', lane: 0 }, { time: 22200, type: 'note', lane: 1 },
+            { time: 22400, type: 'note', lane: 2 }, { time: 22600, type: 'note', lane: 3 },
+            { time: 23000, type: 'note', lane: 1 }, { time: 23200, type: 'note', lane: 2 },
+            { time: 23400, type: 'note', lane: 0 }, { time: 23600, type: 'note', lane: 3 },
+            { time: 25500, type: 'popup', key: 'k', duration: 2500, x: 400, y: 150 },
+            { time: 26000, type: 'note', lane: 0 }, { time: 26000, type: 'note', lane: 3 },
+            { time: 26500, type: 'note', lane: 1 }, { time: 26500, type: 'note', lane: 2 },
+            { time: 28000, type: 'note', lane: 3 }, { time: 28150, type: 'note', lane: 2 },
+            { time: 28300, type: 'note', lane: 1 }, { time: 28450, type: 'note', lane: 0 },
+            { time: 28600, type: 'note', lane: 1 }, { time: 28750, type: 'note', lane: 2 },
+            { time: 28900, type: 'note', lane: 3 },
+            { time: 30000, type: 'code', sequence: ['f', 'f', 'j', 'k'], duration: 3000 },
+            { time: 32000, type: 'popup', key: 'l', duration: 2000, x: 50, y: 300 },
+            { time: 32500, type: 'popup', key: 'j', duration: 2000, x: 500, y: 50 },
+            { time: 34000, type: 'note', lane: 0 }, { time: 34100, type: 'note', lane: 0 },
+            { time: 34200, type: 'note', lane: 1 }, { time: 34300, type: 'note', lane: 1 },
+            { time: 34400, type: 'note', lane: 2 }, { time: 34500, type: 'note', lane: 2 },
+            { time: 34600, type: 'note', lane: 3 }, { time: 34700, type: 'note', lane: 3 },
+            { time: 40000, type: 'message', text: '¡¡¡NO PUEDES DETENERME!!!' },
+            { time: 40100, type: 'glitch', duration: 500 },
+            { time: 41000, type: 'note', lane: 0 }, { time: 41100, type: 'note', lane: 3 },
+            { time: 41200, type: 'note', lane: 1 }, { time: 41300, type: 'note', lane: 2 },
+            { time: 41400, type: 'note', lane: 0 }, { time: 41500, type: 'note', lane: 3 },
+            { time: 42000, type: 'code', sequence: ['f', 'j', 'k', 'l', 'f'], duration: 2500 },
+            { time: 42000, type: 'glitch', duration: 2500 },
+            { time: 43000, type: 'note', lane: 0 }, { time: 43000, type: 'note', lane: 1 },
+            { time: 43000, type: 'note', lane: 2 }, { time: 43000, type: 'note', lane: 3 },
+            { time: 45000, type: 'popup', key: 'j', duration: 1500, x: 250, y: 150 },
+            { time: 45100, type: 'glitch', duration: 500 },
+            { time: 45500, type: 'popup', key: 'f', duration: 1500, x: 50, y: 50 },
+            { time: 46000, type: 'popup', key: 'l', duration: 1500, x: 500, y: 300 },
+            { time: 47000, type: 'note', lane: 3 }, { time: 47100, type: 'note', lane: 2 },
+            { time: 47200, type: 'note', lane: 1 }, { time: 47300, type: 'note', lane: 0 },
+            { time: 47400, type: 'note', lane: 3 }, { time: 47500, type: 'note', lane: 2 },
+            { time: 47600, type: 'note', lane: 1 }, { time: 47700, type: 'note', lane: 0 },
+            { time: 47800, type: 'note', lane: 3 }, { time: 47900, type: 'note', lane: 2 },
+            { time: 48000, type: 'note', lane: 1 }, { time: 48100, type: 'note', lane: 0 },
+            { time: 50000, type: 'message', text: '¡¡¡ERRRRRROOOOORR!!!' },
+            { time: 50000, type: 'glitch', duration: 3000 },
+            { time: 50500, type: 'code', sequence: ['l', 'k', 'j', 'f'], duration: 2000 },
+            { time: 51000, type: 'note', lane: 0 }, { time: 51000, type: 'note', lane: 3 },
+            { time: 51200, type: 'note', lane: 1 }, { time: 51200, type: 'note', lane: 2 },
+            { time: 51400, type: 'note', lane: 0 }, { time: 51400, type: 'note', lane: 3 },
+            { time: 51600, type: 'note', lane: 1 }, { time: 51600, type: 'note', lane: 2 },
+            { time: 54000, type: 'note', lane: 0 }, { time: 54000, type: 'note', lane: 1 },
+            { time: 54000, type: 'note', lane: 2 }, { time: 54000, type: 'note', lane: 3 },
+            { time: 54250, type: 'note', lane: 0 }, { time: 54250, type: 'note', lane: 1 },
+            { time: 54250, type: 'note', lane: 2 }, { time: 54250, type: 'note', lane: 3 },
+            { time: 55000, type: 'message', text: '...imposible...' },
+        ];
+
+
+        // --- 3. ESTADO DEL JUEGO ---
+        let gameState = 'pending';
+        let integrity = 100;
+        let gameTime = 0;
+        let lastFrameTime = 0;
+        let beatmapIndex = 0;
+        let animationFrameId = null;
+
+        let activeNotes = [];
+        let activePopups = [];
+        let activeCodeInjection = null;
+
+        // --- 4. LÓGICA DE INICIO / FIN / REINICIO ---
+
+        // Función de ayuda para pausas
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function showIntro() {
+            const introMessages = [
+                { text: "Accediendo al núcleo...", duration: 2000 },
+                { text: "Detectando anomalía...", duration: 2500 },
+                { text: "ERROR: EL BUGGER TE HA VISTO", duration: 3000 },
+                { text: "¡¡¡SOBREVIVE!!!", duration: 1500 }
+            ];
+
+            // Prepara la pantalla
+            startScreen.style.display = 'none';
+            endScreen.style.display = 'none';
+            gameScreen.style.display = 'block';
+            buggerMessage.style.display = 'flex';
+
+            // Muestra los mensajes en secuencia
+            for (const msg of introMessages) {
+                buggerMessage.textContent = msg.text;
+                await sleep(msg.duration);
+            }
+
+            // Oculta el mensaje y muestra el menú de inicio
+            buggerMessage.style.display = 'none';
+            startScreen.style.display = 'flex';
+
+            // Añade el listener para empezar el juego
+            startScreen.addEventListener('click', startGame, { once: true });
+        }
+
+
+        function init() {
+            // Modificado para llamar a showIntro al inicio
+            endScreen.addEventListener('click', resetGame, { once: true });
+            showIntro(); // Inicia la secuencia de intro al cargar
+        }
+
+        function startGame() {
+            // Reiniciar estado
+            integrity = 100;
+            gameTime = 0;
+            beatmapIndex = 0;
+            activeNotes = [];
+            activePopups = [];
+            activeCodeInjection = null;
+
+            // Limpiar DOM
+            gameScreen.querySelectorAll('.note, .popup').forEach(el => el.remove());
+            gameContainer.classList.remove('glitch-effect');
+
+            // Configurar UI
+            integrityFill.style.width = '100%';
+            startScreen.style.display = 'none';
+            endScreen.style.display = 'none';
+            codeInjectionOverlay.style.display = 'none';
+            buggerMessage.style.display = 'none';
+
+            // Iniciar bucle
+            gameState = 'playing';
+            lastFrameTime = performance.now();
+            animationFrameId = requestAnimationFrame(gameLoop);
+
+            // Audio
+            audioBoss.currentTime = 0;
+            audioBoss.play();
+
+            // Listeners
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+        }
+
+        function resetGame() {
+            document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keyup', handleKeyUp);
+
+            audioBoss.pause();
+
+            // Oculta todas las pantallas
+            endScreen.style.display = 'none';
+            gameScreen.style.display = 'none';
+            startScreen.style.display = 'none';
+
+            // Resetear la pantalla de "Game Over"
+            screamerImage.style.display = 'none';
+            endTitle.style.display = 'block';
+            endSubtitle.style.display = 'block';
+            endMessage.style.display = 'block';
+            endScreen.style.background = 'rgba(0, 0, 0, 0.9)';
+
+            // Llama a la intro de nuevo para el bucle
+            showIntro();
+        }
+
+        function endGame(won) {
+            gameState = won ? 'win' : 'gameover';
+            cancelAnimationFrame(animationFrameId);
+
+            audioBoss.pause();
+
+            if (won) {
+                // --- LÓGICA DE VICTORIA ---
+                endTitle.textContent = 'SYSTEM_CLEANSED';
+                endTitle.style.color = '#00FF41';
+                endSubtitle.textContent = 'El Bugger ha sido eliminado.';
+
+                // Asegurarse de que el texto de victoria sea visible
+                endTitle.style.display = 'block';
+                endSubtitle.style.display = 'block';
+                endMessage.style.display = 'block';
+                endScreen.style.background = 'rgba(0, 0, 0, 0.9)';
+                screamerImage.style.display = 'none';
+
+            } else {
+                // --- LÓGICA DE DERROTA ---
+
+                // 1. Ocultar el texto de "GAME OVER" al principio
+                endTitle.style.display = 'none';
+                endSubtitle.style.display = 'none';
+                endMessage.style.display = 'none';
+
+                // 2. Mostrar el screamer
+                endScreen.style.background = '#000'; // Fondo negro sólido
+                screamerImage.style.display = 'block';
+                sfxScreamer.currentTime = 0;
+                sfxScreamer.play();
+
+                // 3. Poner un temporizador para cambiar al "GAME OVER" después de 2 segundos
+                setTimeout(() => {
+                    // Ocultar el screamer
+                    screamerImage.style.display = 'none';
+
+                    // Restaurar el fondo y mostrar el texto
+                    endScreen.style.background = 'rgba(0, 0, 0, 0.9)';
+                    endTitle.textContent = 'GAME OVER';
+                    endTitle.style.color = '#FF0000';
+                    endSubtitle.textContent = 'El Bugger ha tomado el control.';
+
+                    endTitle.style.display = 'block';
+                    endSubtitle.style.display = 'block';
+                    endMessage.style.display = 'block';
+
+                }, 2000);
+            }
+
+            gameScreen.style.display = 'none';
+            endScreen.style.display = 'flex';
+
+            // NOTA: Se elimina la línea que permitía hacer clic para reiniciar:
+            // endScreen.addEventListener('click', resetGame, { once: true });
+
+            // --- REDIRECCIÓN AL FORMULARIO ---
+            // Se realiza la redirección 5 segundos después de que termina el juego.
+            const redirectionDelay = 5000;
+            setTimeout(() => {
+                window.location.href = 'https://forms.gle/VHQwSwJ1fJDfW2V77';
+            }, redirectionDelay);
+            // ---------------------------------
+        }
+
+
+        // --- 5. BUCLE PRINCIPAL DEL JUEGO ---
+
+        function gameLoop(now) {
+            if (gameState !== 'playing') return;
+
+            // Aceleración
+            const deltaTime = now - lastFrameTime;
+            const gameSpeedMultiplier = 1.0 + (gameTime * ACCELERATION_RATE);
+            const effectiveDeltaTime = deltaTime * gameSpeedMultiplier;
+
+            gameTime += effectiveDeltaTime;
+            lastFrameTime = now;
+
+            // 1. Spawnea eventos
+            spawnBeatmapEvents();
+
+            // 2. Actualiza objetos
+            updateNotes(effectiveDeltaTime);
+            updatePopups(effectiveDeltaTime);
+            updateCodeInjection(effectiveDeltaTime);
+
+            // 3. Comprueba condiciones
+            if (integrity <= 0) {
+                endGame(false);
+                return;
+            }
+            if (gameTime >= GAME_DURATION_MS && beatmapIndex === beatmap.length && activeNotes.length === 0) {
+                endGame(true);
+                return;
+            }
+
+            // 4. Siguiente frame
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- 6. MANEJO DE EVENTOS (SPAWN) ---
+
+        function spawnBeatmapEvents() {
+            while (beatmapIndex < beatmap.length && beatmap[beatmapIndex].time <= gameTime) {
+                const event = beatmap[beatmapIndex];
+
+                switch(event.type) {
+                    case 'note':
+                        spawnNote(event.lane);
+                        break;
+                    case 'popup':
+                        spawnPopup(event.key, event.duration, event.x, event.y);
+                        break;
+                    case 'code':
+                        spawnCodeInjection(event.sequence, event.duration);
+                        break;
+                    case 'message':
+                        showMessage(event.text);
+                        break;
+                    case 'glitch':
+                        spawnGlitch(event.duration);
+                        break;
+                }
+
+                beatmapIndex++;
+            }
+        }
+
+        function spawnNote(lane) {
+            const note = document.createElement('div');
+            note.className = 'note';
+            note.style.top = '-20px';
+            note.dataset.lane = lane;
+
+            const laneElement = document.getElementById(`lane-${lane}`);
+            laneElement.appendChild(note);
+
+            activeNotes.push({
+                element: note,
+                lane: lane,
+                y: 0
+            });
+        }
+
+        // ****** INICIO DE MODIFICACIÓN DE POPUP ******
+        function spawnPopup(key, duration, x, y) {
+            if (activePopups.find(p => p.key === key)) return;
+
+            const popup = document.createElement('div');
+            popup.className = 'popup';
+            popup.style.left = `${x}px`;
+            popup.style.top = `${y}px`;
+
+            popup.innerHTML = `
+                <div class="popup-titlebar">FATAL_ERROR.DLL</div>
+                <div class="popup-content">
+                    <p>¡ERROR CRÍTICO!</p>
+                    <span>Pulsa [ENTER] para cerrar</span>
+                </div>
+            `;
+            // Se ha cambiado el texto de arriba de "key.toUpperCase()" a "ENTER"
+
+            gameScreen.appendChild(popup);
+
+            activePopups.push({
+                element: popup,
+                key: key, // Mantenemos la key original por si acaso, pero no la usamos para el 'hit'
+                remainingTime: duration
+            });
+        }
+        // ****** FIN DE MODIFICACIÓN DE POPUP ******
+
+        function spawnCodeInjection(sequence, duration) {
+            if (activeCodeInjection) return;
+
+            activeCodeInjection = {
+                sequence: sequence,
+                duration: duration,
+                remainingTime: duration,
+                currentIndex: 0
+            };
+
+            codeInput.textContent = '_';
+            codeInjectionOverlay.style.display = 'flex';
+        }
+
+        function showMessage(text) {
+            // Mensajes DENTRO del juego (pequeños)
+            buggerMessage.textContent = text;
+            buggerMessage.style.fontSize = '28px';
+            buggerMessage.style.background = 'none';
+            buggerMessage.style.top = '60px';
+            buggerMessage.style.height = 'auto';
+
+            buggerMessage.style.display = 'flex';
+
+            setTimeout(() => {
+                if (buggerMessage.textContent === text) {
+                    buggerMessage.style.display = 'none';
+                    // Restaura estilos de intro
+                    buggerMessage.style.fontSize = '64px';
+                    buggerMessage.style.background = 'rgba(0, 0, 0, 0.95)';
+                    buggerMessage.style.top = '0';
+                    buggerMessage.style.height = '100%';
+                }
+            }, 3000);
+        }
+
+        function spawnGlitch(duration) {
+            gameContainer.classList.add('glitch-effect');
+            setTimeout(() => {
+                gameContainer.classList.remove('glitch-effect');
+            }, duration);
+        }
+
+        // --- 7. LÓGICA DE ACTUALIZACIÓN (UPDATE) ---
+
+        function updateNotes(effectiveDeltaTime) {
+            for (let i = activeNotes.length - 1; i >= 0; i--) {
+                const note = activeNotes[i];
+                note.y += NOTE_SPEED * effectiveDeltaTime;
+
+                note.element.style.transform = `translateY(${note.y}px)`;
+
+                if (note.y > TARGET_Y + HIT_WINDOW) {
+                    missNote(note, i);
+                }
+            }
+        }
+
+        function updatePopups(effectiveDeltaTime) {
+            for (let i = activePopups.length - 1; i >= 0; i--) {
+                const popup = activePopups[i];
+                popup.remainingTime -= effectiveDeltaTime;
+
+                if (popup.remainingTime <= 0) {
+                    missPopup(popup, i);
+                }
+            }
+        }
+
+        function updateCodeInjection(effectiveDeltaTime) {
+            if (!activeCodeInjection) return;
+
+            activeCodeInjection.remainingTime -= effectiveDeltaTime;
+
+            const progress = (activeCodeInjection.remainingTime / activeCodeInjection.duration) * 100;
+            codeTimerFill.style.width = `${Math.max(0, progress)}%`;
+
+            if (activeCodeInjection.remainingTime <= 0) {
+                missCodeInjection();
+            }
+        }
+
+        // --- 8. MANEJO DE ENTRADAS (INPUT) ---
+
+        function handleKeyDown(e) {
+            if (gameState !== 'playing' || e.repeat) return;
+
+            const key = e.key.toLowerCase();
+
+            if (KEY_INDICATOR_MAP[key] !== undefined) {
+                keyIndicators[KEY_INDICATOR_MAP[key]].classList.add('active');
+            }
+
+            if (activeCodeInjection) {
+                handleCodeInput(key);
+                return;
+            }
+
+            // ****** INICIO DE MODIFICACIÓN DE POPUP ******
+            // handlePopupHit ahora tiene prioridad y maneja la penalización
+            if (handlePopupHit(key)) {
+                return; // El popup (o la penalización) ha consumido la tecla
+            }
+            // ****** FIN DE MODIFICACIÓN DE POPUP ******
+
+            if (KEYS.includes(key)) {
+                handleRhythmHit(key);
+            }
+        }
+
+        function handleKeyUp(e) {
+            const key = e.key.toLowerCase();
+            if (KEY_INDICATOR_MAP[key] !== undefined) {
+                keyIndicators[KEY_INDICATOR_MAP[key]].classList.remove('active');
+            }
+        }
+
+        function handleRhythmHit(key) {
+            const lane = LANE_MAP[key];
+            let closestNote = null;
+            let closestDist = Infinity;
+
+            for (let i = 0; i < activeNotes.length; i++) {
+                const note = activeNotes[i];
+                if (note.lane === lane) {
+                    const dist = Math.abs(note.y - TARGET_Y);
+                    if (dist < closestDist && dist <= HIT_WINDOW) {
+                        closestDist = dist;
+                        closestNote = note;
+                    }
+                }
+            }
+
+            if (closestNote) {
+                hitNote(closestNote);
+            } else {
+                playErrorBeep();
+                changeIntegrity(-5);
+            }
+        }
+
+        // ****** INICIO DE MODIFICACIÓN DE POPUP ******
+        function handlePopupHit(key) {
+            // Esta función se llama ANTES que handleRhythmHit
+
+            if (activePopups.length === 0) {
+                return false; // No hay popups, no consume la tecla
+            }
+
+            // Si hay un popup activo...
+            if (key === 'enter') {
+                // ¡Acierto! Cierra el popup más antiguo.
+                hitPopup(activePopups[0], 0); // Cierra el primer popup en el array
+                return true; // Consume la tecla
+            } else if (KEYS.includes(key)) {
+                // ¡Penalización! Pulsó F,J,K,L.
+                playErrorBeep();
+                changeIntegrity(-5); // Penalización (igual que un misfire)
+                return true; // Consume la tecla (para que no se procese como un "misfire" de ritmo)
+            }
+
+            // Si el popup está activo pero pulsa 'a', 'b', 'c', etc.
+            return false; // No consume la tecla, simplemente la ignora.
+        }
+        // ****** FIN DE MODIFICACIÓN DE POPUP ******
+
+        function handleCodeInput(key) {
+            if (!activeCodeInjection) return;
+
+            const seq = activeCodeInjection.sequence;
+            const index = activeCodeInjection.currentIndex;
+
+            if (key === seq[index]) {
+                activeCodeInjection.currentIndex++;
+                const typed = seq.slice(0, activeCodeInjection.currentIndex).join(' ');
+                codeInput.textContent = typed + '_';
+
+                if (activeCodeInjection.currentIndex === seq.length) {
+                    hitCodeInjection();
+                }
+            } else {
+                missCodeInjection();
+            }
+        }
+
+        // Función de ayuda para el beep
+        function playErrorBeep() {
+            sfxBeep.currentTime = 0;
+            sfxBeep.play();
+        }
+
+        // --- 9. LÓGICA DE ACIERTO / FALLO ---
+
+        function changeIntegrity(amount) {
+            integrity = Math.max(0, Math.min(100, integrity + amount));
+            integrityFill.style.width = `${integrity}%`;
+
+            if (integrity < 30) {
+                integrityFill.style.backgroundColor = '#FF0000';
+            } else {
+                integrityFill.style.backgroundColor = '#00FF41';
+            }
+        }
+
+        function hitNote(note) {
+            note.element.classList.add('hit');
+            setTimeout(() => {
+                note.element.remove();
+            }, 100);
+            activeNotes = activeNotes.filter(n => n !== note);
+        }
+
+        function missNote(note, index) {
+            note.element.remove();
+            activeNotes.splice(index, 1);
+            changeIntegrity(-10);
+            playErrorBeep();
+        }
+
+        function hitPopup(popup, index) {
+            // Esta función ahora SÍ usa el índice, porque la llamamos con (popup[0], 0)
+            popup.element.remove();
+            activePopups.splice(index, 1); // Elimina el popup del array
+        }
+
+        function missPopup(popup, index) {
+            popup.element.remove();
+            activePopups.splice(index, 1);
+            changeIntegrity(-15);
+            playErrorBeep();
+        }
+
+        function hitCodeInjection() {
+            codeInjectionOverlay.style.display = 'none';
+            activeCodeInjection = null;
+        }
+
+        function missCodeInjection() {
+            codeInjectionOverlay.style.display = 'none';
+            activeCodeInjection = null;
+            changeIntegrity(-20);
+            playErrorBeep();
+        }
+
+        // --- INICIAR EL JUEGO ---
+        init();
+    });
+</script>
+</body>
+</html>
