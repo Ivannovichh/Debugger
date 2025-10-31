@@ -19,7 +19,7 @@ Aquí puedes ver algunas capturas de pantalla de la interfaz, la acción del jue
 ### 5. Contenido del Formulario
 ![MARCADOR DE IMAGEN 5: Captura de la sección de preguntas o detalles importantes dentro del formulario](Imagenes/form.png)
 
-###6. Final del Formulario
+### 6. Final del Formulario
 ![MARCADOR DE IMAGEN 6: Captura de la sección de preguntas o detalles importantes dentro del formulario](Imagenes/emocionesform.png)
 
 ---
